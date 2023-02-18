@@ -1,0 +1,158 @@
+﻿<!-- Отображает список сотрудников с разбивкой на страницы.
+Он включает в себя форму поиска, которая позволяет пользователям фильтровать результаты по полному имени и номеру телефона.
+Поиск реализован с помощью jQuery и AJAX, а отфильтрованные результаты отображаются в таблице с помощью JavaScript.
+Представление также содержит кнопки для создания, редактирования и удаления записей о сотрудниках. -->
+@model IEnumerable<BookEmp.Models.Employee>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+@{
+    int pageSize = 25;
+    int currentPage = (ViewContext.HttpContext.Request.Query["page"].ToString() == "" ? 1 : Convert.ToInt32(ViewContext.HttpContext.Request.Query["page"]));
+    int pageCount = (int)Math.Ceiling(Model.Count() / (double)pageSize);
+    var employees = Model.Skip((currentPage - 1) * pageSize).Take(pageSize);
+    ViewData["Title"] = $"Справочник сотрудников - страница № {currentPage}";
+}
+
+<h4>Справочник сотрудников - страница № @currentPage</h4>
+<p class="float-right">
+    <a asp-action="Create" class="btn btn-outline-primary">Добавить сотрудника</a>
+</p>
+
+<!-- Отображение кнопки поиска -->
+<button type="button" class="btn btn-primary" id="search-toggle">
+    <i class="fa fa-search"></i>Поиск
+</button>
+<form id="search-form" style="display:none;">
+    <div class="form-group">
+        <input type="text" class="form-control" id="search-fullname" placeholder="Поиск по ФИО">
+    </div>
+    <div class="form-group">
+        <input type="text" class="form-control" id="search-phone" placeholder="Поиск по номеру телефона">
+    </div>
+</form>
+
+<!-- Скрипт работы поиска -->
+<script>
+    $(document).ready(function () {
+        //Переключать видимость формы поиска и списка сотрудников
+        $("#search-toggle").click(function () {
+            $("#search-form").toggle();
+            if ($("#search-toggle").hasClass("btn-warning")) {
+                $(".text-center").hide();
+            } else {
+                $(".text-center").show();
+            }
+        });
+        //Обработка изменений в форме поиска
+        $("#search-fullname, #search-phone").on("input", function () {
+            //Получить фильтры поиска
+            var fullnameFilter = $("#search-fullname").val().toLowerCase();
+            var phoneFilter = $("#search-phone").val().toLowerCase();
+            //Отправляем запрос AJAX на сервер с поисковыми фильтрами
+            $.ajax({
+                url: "/Employee/Search",
+                data: { fullnameFilter: fullnameFilter, phoneFilter: phoneFilter },
+                success: function (data) {
+                    //Создаем HTML для списка сотрудников
+                    var employees = data.employees;
+                    var html = "";
+                    for (var i = 0; i < employees.length; i++) {
+                        html += "<tr><td>" + "<a class='btn btn-success' href='/Employee/Edit?id=" + employees[i].id + "&fio=" + employees[i].fio + "&depName=" + employees[i].depName + "&phone=" + employees[i].phone + "&photoURL=" + employees[i].photoURL + "&depID=" + employees[i].depID + "'>Изменить</a> | " +
+                        "<a class='btn btn-danger' href='/Employee/DeleteStd?id=" + employees[i].id + "' onclick='return confirm(\"Действительно удалить данную запись?\")'>Удалить</a>" + "</td><td>" + employees[i].fio + "</td><td>" + employees[i].depName + "</td><td>" + employees[i].phone + "</td><td><img src='" + employees[i].photoURL + "' alt='Employee photo' width='100' height='100'></td></tr>";}
+                        //Обновляем список сотрудников сгенерированным HTML
+                        $("#EmployeesList").html(html);
+                },
+                error: function (xhr, status, error) {
+                    console.log("Error: " + error);
+                }
+            });
+            //Переключать видимость формы поиска и списка сотрудников в зависимости от наличия поисковых фильтров
+            if ($("#search-fullname").val().length > 0 || $("#search-phone").val().length > 0) {
+                $("#search-toggle").removeClass("btn-primary").addClass("btn-warning");
+                $(".text-center").hide();
+            } else {
+                $("#search-toggle").removeClass("btn-warning").addClass("btn-primary");
+                $(".text-center").show();
+            }
+        });
+        //Отправить форму поиска
+        $("#search-form").submit(function (event) {
+            event.preventDefault();
+            $("#search-fullname, #search-phone").trigger("input");
+        });
+    });
+</script>
+
+<!-- Отображение таблицы с сотрудниками -->
+<table class="table">
+    <thead>
+        <tr>
+            <!-- Показать заголовки таблиц для действия, ФИО, название отдела, номер телефона и фото сотрудника -->
+            <th>Действия:</th>
+            <th>
+                @Html.DisplayNameFor(model => model.FIO)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.DepName)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Phone)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.PhotoURL)
+            </th>
+        </tr>
+    </thead>
+    <tbody id="EmployeesList">
+        <!-- Проверить, есть ли какие-либо записи о сотрудниках для отображения -->
+        @if (employees.Any())
+        {
+            <!-- Перебрать записи о каждом сотруднике и отобразить информацию о них в таблице -->
+            @foreach (var item in employees)
+            {
+                <tr>
+                    <td>
+                        <!-- Показать кнопки для редактирования и удаления каждой записи каждого сотрудника -->
+                        @Html.ActionLink("Изменить", "Edit", new { item.ID, item.FIO, item.DepName, item.Phone, item.PhotoURL, item.DepID }, new { @class = "btn btn-success" }) |
+                        @Html.ActionLink("Удалить", "DeleteStd", new { item.ID }, new { @class = "btn btn-danger", onclick = "return confirm('Действительно удалить данную запись?')" })
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.FIO)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.DepName)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.Phone)
+                    </td>
+                    <td>
+                        <img src="@item.PhotoURL" alt="Employee photo" width="100" height="100">
+                    </td>
+                </tr>
+            }
+        }
+        else
+        {
+            <!-- Если нет записей о сотрудниках для отображения, показать сообщение -->
+            <tr>
+                <td colspan="5">Нет данных</td>
+            </tr>
+        }
+    </tbody>
+</table>
+<!-- Показать ссылки на страницы -->
+<div class="text-center" style="font-size:20px;">
+    <!-- Перебрать каждую страницу записей о сотрудниках и отобразить ссылку для каждой страницы -->
+    @for (int i = 1; i <= pageCount; i++)
+    {
+        <!-- Если отображается текущая страница, сделать ссылку полужирной -->
+        if (i == currentPage)
+        {
+            <a asp-route-page="@i" style="margin:5px; font-weight:bold;">@i</a>
+        }
+        else
+        {
+            <a asp-route-page="@i" style="margin:5px;">@i</a>
+        }
+    }
+</div>
